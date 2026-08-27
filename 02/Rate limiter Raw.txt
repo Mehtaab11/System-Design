@@ -1,0 +1,177 @@
+Rate limiter
+
+No.of tries should be limited
+security reasons
+so that no one can brute force it
+
+
+youtube has rate limit for uploading videos 24 hours max limit is 20 approx. so that we dont exploit youtube database with unneccesary content 
+
+because storage need money so more content = more storage = more expense
+
+
+so basically a rate limiter is a safeguard that we use to restrict exploitation or mainly brute force for security purpose
+
+to avoid too many request from one source
+
+functional requirements of a rate limiter
+
+1. what are we designing our rate limiter for
+ - is it going to be used for some backend service
+2. is it just for a single api ? 
+
+lets suppose we are going to implement for multiple server's safeguard
+
+there can be multiple instance of an api ... rate limiting should be able to handle both
+
+
+what should happen once the rate limit is reached ?/
+what should happen in that case
+
+the user should not be able to make more requests
+
+maybe use a timer to tell them how long they have to wait
+
+the concept is highly related to throttle
+
+http error will be  400 for this rate limit error 429
+because it is a client side error nothing is wrong on our server side
+
+
+
+what about client side rate limiting
+we can put a check on the frontend side to prevent the request even going for server
+important question for students
+
+they can simply be reverse engineering and exploit the APIs using a simple CURL requests they are not even using our application in the first place
+
+
+lets consider it be a general api ratelimiter 
+what about IP address to track those?
+
+
+non-functional requirements 
+
+latency requirements : we want as low as possible
+
+we want to pretend like the rate limit doesn't even exist
+
+a lot of throughput should be able to manage
+
+storage?? how much are we going to store ... what are we even going to store?
+how much data are we even going to store for per user
+
+
+
+lets say we track ip and an ip address take 4 bytes lets say we also store attempts 
+
+lets say one user take 132 bytes by this means
+
+now lets suppose we have 1 billion user that would turn into 132 x 1 billion = 132 gb
+so we are going to need 132 gb of storage
+
+we can fix that much into a normal memory 
+
+we need high availability
+
+what if our system goes down??
+
+how are we going to handle that?
+
+fail-open ? we allow request and act like that it never even existed in the first place
+fail-close ? we dont allow requests we close the service
+
+fail-open : most user will be able to use the app normally but the small set of people who are trying to exploit the app will also be able to go through
+
+but in fail close
+fail-close : no-one is able to go through it even the real user as well
+note that we are taking in care that we are having a user base of 1 billion
+
+try to get requirements from your interviewer by first 5-10 minutes
+
+
+HLD 
+we also need some form of storage to store our rules 
+we canuse any form of the database that is doable 
+
+the first point of contact for the user is our rate limiter so as soon as the user is touching the rate limiter we should check for the rules there
+
+we can have in memory store 
+for fast retrieval 
+redis
+
+we also need to write to the db as well
+
+design details
+whatkind of algorithms?
+
+100/min 
+
+we can have a minute timer for this 
+wher we allow only 100 request per minute 
+but there can be exploitation of tis the user can send 100 request in the last second of first minute and also 100 request in the 1 second of 2nd minute
+
+that becomes 200req/2s 
+
+which simply breaches what we are trying to do 
+but that is not even a problem because thats okay because the user might not be able to put request for another 59 seconds 
+
+this is what we call fix window algorithm for rate limiting
+
+and that is an actually really good algorithm to work with
+
+but what can be better ? sliding window? hahhaha
+
+in here we include we track what happened in last second
+with each second passing we remove from left and add to the right 
+
+we can store in unix time stamp
+
+we dont need to store any more info 
+that is what the tradeoff here
+
+fixed size window is reliable and easy to implement but it proposes some vulnerabilities
+and sliding window on the other hand is much better with less vulnerabilities 
+but it is harder to implement
+
+redis is good for this
+
+sorted set can be used in redis
+
+based on time stamps
+there are many more algorithms it is more of a domain based knowledge 
+
+
+schema:
+
+key: fixed window algo count
+
+userid : count of how many request user has sent
+expire: default redis rules
+
+storage :
+id:string 
+api: string
+operation: string
+timeunit : min/hr/sec
+requests allowed: number
+
+can we scale in-memory database??
+
+we can have multiple instances of it...
+and we can use consistent hashing to get it done
+talk more about consistent hashing
+
+try to get the latency as low as possible
+
+reading form a database is much slower that reading from a in-memory database
+  
+we can also use cache to get the rules as quickly as possible 
+
+
+
+
+
+
+
+
