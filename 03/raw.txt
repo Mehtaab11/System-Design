@@ -50,4 +50,8 @@ base conversion is better because
 how base conversion works? 
 
 
+for 150 gb of the storage we can opt for mongo + redis 
+
+
+
 
