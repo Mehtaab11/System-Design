@@ -1,0 +1,53 @@
+in most of the url shortener the write to read ratio is mainly less
+
+1:100 for instance
+
+1 Billion write / month would result in 100 Billion read / month
+
+lets say we make the shortener which has 8 character encoding 
+
+e.g. tiny.url/xxxxxxx
+
+
+here if we only use number for character encoding 0-9 :
+    then the possible number of combination 9 ^ 8
+
+if we go for the all alphanumeric characters (0-9, a-z, A-Z), then the possible number of combinations would be 62 ^ 8.
+
+that would result in total combinations of 218,340,105,584,896 (approximately 218 trillion) unique URLs.
+
+that would be more than enough for a URL shortener site, considering the write to read ratio 
+
+so that would mean that the total storage capacity required for storing the mappings of short URLs to long URLS would be significantly less than the total number of combinations available.
+
+total approximate storage required = (average size of URL generated + metadata of the url ) * total number of possible writes per month
+
+lets say the url size will be 100 bytes on average and metadata size is 50 bytes, then the total storage required for 1 billion writes per month would be:
+total storage required = (100 bytes + 50 bytes) * 1 billion writes  = 150 bytes * 1 billion = 150 billion bytes = 150 GB
+
+given above is just back on the envelope calculation, in reality, the storage required would be more due to indexing, database overhead, and other factors. 
+
+what kind of database would be suitable for this kind of application?
+
+for a url shortener application with much higher read ratio, a better choice would be a NoSQL database that is optimized for read-heavy workloads. Some suitable options include:
+MongoDB
+Cassandra
+Redis (also responsible for caching and in memory)
+
+next step would be to design the schema for the database.
+
+
+another big step would be the generation of the chararcter code 
+
+we cant use normal hashing algo like SHA or MD5 because they are not reversible and we need to be able to retrieve the original URL from the shortened version.
+
+also there is high chance of collision if we use a simple hashing algorithm, especially when the number of writes increases.
+
+
+to fix this we can use something like a base conversion algorithm to convert the unique ID of the URL into a short code.
+
+base conversion is better because 
+how base conversion works? 
+
+
+
