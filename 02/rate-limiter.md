@@ -90,7 +90,7 @@ When a user is rate-limited, the server should respond with:
 HTTP 429 Too Many Requests
 ```
 
-Not `400 Bad Request` — because nothing is wrong with the request itself,
+Not `500 Bad Request` — because nothing is wrong with the request itself,
 and it's not a server-side failure either. `429` specifically communicates
 _"you, the client, are sending too many requests."_
 
