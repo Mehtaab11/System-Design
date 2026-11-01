@@ -747,4 +747,65 @@ Redirect handler -> push event {code, ts, ip, ua, referrer} to queue (fire-and-f
 
 ---
 
+---
+
+## 17. Conclusion
+
+### The problem in one paragraph
+A URL shortener looks trivial, but at **1 billion writes and 100 billion reads per month** it becomes a system design problem about three things: **generating unique short codes without collisions, serving about 38K reads/sec (100K at peak) with very low latency, and managing 150 GB+ of new data every month** (about 1.8 TB per year, before replication and indexes).
+
+### Final design at a glance
+
+| Concern | Final decision | Core reason |
+|---|---|---|
+| Code length and charset | 7 characters, Base62 | 62^7 ≈ 3.5 T codes, about 290 years of capacity, URL-safe with no escaping |
+| Code generation | Range-allocated counter + Base62 + bijective scrambling | Zero collisions by construction, no read-before-write, unpredictable-looking codes |
+| Primary database | MongoDB, sharded on hashed `_id`, replica sets | Key-value access pattern, easy horizontal scaling, native TTL index |
+| Cache | Redis, cache-aside, LRU/LFU eviction | About 80% of traffic hits about 20% of links; absorbs the read load |
+| Redirect type | HTTP 302 | Keeps analytics, expiry, and link revocation possible |
+| Expiry | Lazy check on read + Mongo TTL index + Redis TTL capped at link expiry | Lazy check gives exactness; TTL index gives cheap cleanup |
+| Purging | Batched hard delete (optionally soft delete or archive first) via cron/BullMQ sweeper | Reclaims storage, keeps indexes small, meets retention and compliance needs |
+| Scaling | Stateless app servers behind a load balancer, separate read/write services, CDN for hot links | Reads are about 100x writes, so scale them independently |
+| Analytics | Async via queue (Kafka/BullMQ), separate store | Never slows the redirect path |
+
+### Key lessons
+
+1. **Read the access pattern first.** Lookup is always `code -> longUrl`, with no joins and no transactions. That single fact drives the choice of NoSQL, caching, and sharding.
+2. **Hashing is the wrong tool for short codes.** The issue is not that hashes are irreversible; it is that truncating a hash to 7 characters makes collisions inevitable (birthday bound at about 1.9 M URLs). A counter plus base conversion is a bijection, so collisions are impossible.
+3. **Predictability is the hidden cost of counters.** Fix it with scrambling, Sqids/Hashids, or a Key Generation Service. Remember that this is obfuscation, not security.
+4. **Redis is a cache, not the source of truth.** RAM is expensive and a lost snapshot means permanently broken links.
+5. **Expiry has two halves.** Logical expiry (the link stops working now) and physical deletion (storage is reclaimed later) need different mechanisms. Use both.
+6. **Never recycle expired codes.** With trillions of codes available, reuse only creates risk: old links could redirect to someone else's content.
+7. **Protect the hot path.** Analytics, purging, and abuse scanning all run asynchronously, away from the redirect request.
+
+### Alternatives and when they win
+
+| If your situation is... | Consider instead |
+|---|---|
+| Small scale (under 10 M links), team already knows SQL | A single PostgreSQL/MySQL instance with a unique index; skip sharding |
+| Extreme write throughput, multi-region active-active | Cassandra or DynamoDB as the primary store |
+| Zero-ops preference, AWS-native | DynamoDB with TTL + ElastiCache |
+| Need unpredictable codes with no scrambling logic | Key Generation Service with pre-generated random keys |
+| Need a fully decentralized ID generator | Snowflake-style IDs (accepting longer codes) |
+| Want to minimize server load and never revoke links | 301 redirects (losing analytics and editability) |
+| Millions of per-link timed events needed | Time-partitioned collections and drop whole partitions |
+
+### Known limitations of the chosen design
+- **Operational complexity:** Mongo shards, Redis cluster, a range-allocation service, a queue, and sweeper jobs. Each is a thing to monitor and fail over.
+- **Eventual consistency:** replica lag can briefly 404 a new link, and analytics counts lag behind real clicks.
+- **Coordinator dependency:** the range service must be highly available, though large ranges give a buffer.
+- **TTL imprecision:** physical deletion lags expiry, so correctness depends on the lazy check.
+- **Capacity numbers are estimates:** real storage will be about 2-3x raw size once indexes, replication, and overhead are included.
+
+### Future improvements
+- Bloom filter in front of the cache to block non-existent-code lookups.
+- Tiered storage: move cold, rarely clicked links to cheaper storage.
+- Geo-distributed read replicas and edge redirects for global latency.
+- Machine-learning-based malicious URL detection, with periodic re-scanning of existing links.
+- Link-level features: password protection, click limits, QR codes, and per-link custom domains.
+
+### Final takeaway
+> The right URL shortener design is not about picking the trendiest database. It is about matching each component to the workload: **a collision-free, range-allocated counter with base62 encoding for codes, a sharded document store for durability, Redis for read speed, 302 redirects for control, and layered expiry and purging for hygiene.** Every choice trades something away, and a strong answer states the choice, the reason, the alternative, and the cost.
+
+
 *End of document.*
