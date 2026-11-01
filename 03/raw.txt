@@ -46,12 +46,36 @@ also there is high chance of collision if we use a simple hashing algorithm, esp
 
 to fix this we can use something like a base conversion algorithm to convert the unique ID of the URL into a short code.
 
-base conversion is better because 
+base conversion is better because it allows us to use a larger character set (like alphanumeric characters) to represent the unique ID, which results in shorter codes.
 how base conversion works? 
+it takes a unique ID (which is typically an integer) and converts it into a string representation using a specified base. For example, if we use base 62 (which includes 0-9, a-z, A-Z), we can represent larger numbers with fewer characters.
 
 
 for 150 gb of the storage we can opt for mongo + redis 
 
+Nosql database will be used here 
+
+with loadbalancers to manage the request load on the servers.
+
+another Important implementation detail is to handle the expiry of the URLs, we can make another type of service that will run periodically to check for expired urls and remove them
+
+
+what kind of service can it be?
+we can use some form of scheduled task runners
+
+Database-Level TTL (Time-To-Live) Indexes
+
+Many modern databases have native mechanisms that automatically track expiration timestamps and delete documents or rows in the background without needing external code.
+• MongoDB: Uses TTL indexes (expireAfterSeconds) where a background thread periodically scans and removes expired documents.
+• Redis: Supports setting a TTL / expiration time on keys, after which Redis automatically evicts them.
 
 
 
+queue manager like bullmq can be of use as well 
+
+we can also go for cronjobs that will be executed at regular intervals to check for expired URLs and remove them from the database.
+
+just like many trading platforms use to give their users daily market updates
+
+another important thing to talk to interviewer about:   
+Database purging is the process of permanently removing obsolete, unwanted, or temporary data from a database to manage storage, improve query performance, and comply with data retention policies
